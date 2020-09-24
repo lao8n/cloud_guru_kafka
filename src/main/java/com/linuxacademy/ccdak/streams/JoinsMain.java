@@ -23,7 +23,45 @@ public class JoinsMain {
         // Get the source stream.
         final StreamsBuilder builder = new StreamsBuilder();
         
-        //Implement streams logic.
+        // TO RUN
+        // Session 2
+        // 1. ./gradlew runStatelessTransformations
+        // Session 3
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-charactercount-topic --property print.key=true --property value.deserializer=org.apache.kafka.common.serialization.IntegerDeserializer
+        // Session 4
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-count-topic --property print.key=true --property value.deserializer=org.apache.kafka.common.serialization.LongDeserializer
+        // Session 5
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-reduce-topic --property print.key=true
+
+        // START STREAM IMPLEMENTATION
+        KStream<String, String> left = builder.stream("joins-input-topic-left");
+        KStream<String, String> right = builder.stream("joins-input-topic-right");
+
+        // Perform an inner join
+        KStream<String, String> innerJoined = left.join(
+            right, 
+            (leftValue, rightValue) -> "left=" + leftValue + ", right=" + rightValue,
+            JoinWindows.of(Duration.ofMinutes(5))
+        );
+        innerJoined.to("inner-join-output-topic");
+
+        // Perform a left join
+        KStream<String, String> leftJoined = left.leftJoin(
+            right, 
+            (leftValue, rightValue) -> "left=" + leftValue + ", right=" + rightValue,
+            JoinWindows.of(Duration.ofMinutes(5))
+        );
+        leftJoined.to("left-join-output-topic");
+
+        // Perform an outer join
+        KStream<String, String> outerJoined = left.outerJoin(
+            right, 
+            (leftValue, rightValue) -> "left=" + leftValue + ", right=" + rightValue,
+            JoinWindows.of(Duration.ofMinutes(5))
+        );
+        outerJoined.to("outer-join-output-topic");
+
+        // FINISH STREAM IMPLEMENTATION
         
         final Topology topology = builder.build();
         final KafkaStreams streams = new KafkaStreams(topology, props);

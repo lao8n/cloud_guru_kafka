@@ -33,7 +33,7 @@ public class AggregationsMain {
         // 1. kafka-console-producer --broker-list localhost:9092 --topic aggregations-input-topic --property parse.key=true --property key.separator=:
         // 2. a:a
         // Session 2
-        // 1. ./gradlew runStatelessTransformations
+        // 1. ./gradlew runAggregations
         // Session 3
         // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-charactercount-topic --property print.key=true --property value.deserializer=org.apache.kafka.common.serialization.IntegerDeserializer
         // Session 4
