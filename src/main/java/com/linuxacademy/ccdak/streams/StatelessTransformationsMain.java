@@ -23,7 +23,55 @@ public class StatelessTransformationsMain {
         // Get the source stream.
         final StreamsBuilder builder = new StreamsBuilder();
         
-        //Implement streams logic.
+        // TO RUN
+        // Session 1
+        // 1. kafka-console-producer --broker-list localhost:9092 --topic stateless-transformations-input-topic --property parse.key=true --property key.separator=:
+        // 2. a:a
+        // Session 2
+        // 1. ./gradlew runStatelessTransformations
+        // Session 3
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic stateless-transformations-output-topic --property print.key=true
+
+        // START STREAM IMPLEMENTATION
+        final KStream<String, String> source = builder.stream("stateless-transformations-input-topic");
+
+        // Split the stream into two streams, one containing all records where the key 
+        // begins with "a" and the other containing all other records
+        KStream<String, String>[] branches = source.branch(
+            (key, value) -> key.startsWith("a"), 
+            (key, value) -> true);
+        KStream<String, String> aKeysStream = branches[0];
+        KStream<String, String> othersStream = branches[1];
+
+        // Remove any records from the "a" stream where the value does not also start with "a"
+        aKeysStream = aKeysStream.filter((key, value) -> value.startsWith("a"));
+
+        // For the "a" stream convert each record into two records, one with an uppercased value and one
+        // with a lowercased value
+        aKeysStream = aKeysStream.flatMap(
+            (key, value) -> {
+                List<KeyValue<String, String>> result = new LinkedList<>();
+                result.add(KeyValue.pair(key, value.toUpperCase()));
+                result.add(KeyValue.pair(key, value.toLowerCase()));
+                return result;
+            }
+        );
+
+        // For the "a" stream modify all records by uppercasing the key
+        aKeysStream = aKeysStream.map(
+            (key, value) -> KeyValue.pair(key.toUpperCase(), value)
+        );
+
+        // Merge the two streams back together
+        KStream<String, String> mergedStream = aKeysStream.merge(othersStream);
+
+        // Print each record to the console
+        mergedStream.peek((key, value) -> System.out.println("key=" + key + ", value=" + value));
+
+        // Output the transformed data to a topic
+        mergedStream.to("stateless-transformations-output-topic");
+
+        // FINISH STREAM IMPLEMENTATION
         
         final Topology topology = builder.build();
         final KafkaStreams streams = new KafkaStreams(topology, props);

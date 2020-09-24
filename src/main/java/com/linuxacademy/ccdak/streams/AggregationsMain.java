@@ -1,16 +1,17 @@
 package com.linuxacademy.ccdak.streams;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.kstream.KGroupedStream;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.KTable;
+import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Produced;
 
 public class AggregationsMain {
 
@@ -29,51 +30,37 @@ public class AggregationsMain {
         
         // TO RUN
         // Session 1
-        // 1. kafka-console-producer --broker-list localhost:9092 --topic stateless-transformations-input-topic --property parse.key=true --property key.separator=:
+        // 1. kafka-console-producer --broker-list localhost:9092 --topic aggregations-input-topic --property parse.key=true --property key.separator=:
         // 2. a:a
         // Session 2
         // 1. ./gradlew runStatelessTransformations
         // Session 3
-        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic stateless-transformations-output-topic --property print.key=true
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-charactercount-topic --property print.key=true --property value.deserializer=org.apache.kafka.common.serialization.IntegerDeserializer
+        // Session 4
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-count-topic --property print.key=true --property value.deserializer=org.apache.kafka.common.serialization.LongDeserializer
+        // Session 5
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-reduce-topic --property print.key=true
 
         // START STREAM IMPLEMENTATION
-        final KStream<String, String> source = builder.stream("stateless-transformations-input-topic");
+        KStream<String, String> source = builder.stream("aggregations-input-topic");
 
-        // Split the stream into two streams, one containing all records where the key 
-        // begins with "a" and the other containing all other records
-        KStream<String, String>[] branches = source.branch(
-            (key, value) -> key.startsWith("a"), 
-            (key, value) -> true);
-        KStream<String, String> aKeysStream = branches[0];
-        KStream<String, String> othersStream = branches[1];
+        // Group the source stream by the existing Key
+        KGroupedStream<String, String> groupedStream = source.groupByKey();
 
-        // Remove any records from the "a" stream where the value does not also start with "a"
-        aKeysStream = aKeysStream.filter((key, value) -> value.startsWith("a"));
-
-        // For the "a" stream convert each record into two records, one with an uppercased value and one
-        // with a lowercased value
-        aKeysStream = aKeysStream.flatMap(
-            (key, value) -> {
-                List<KeyValue<String, String>> result = new LinkedList<>();
-                result.add(KeyValue.pair(key, value.toUpperCase()));
-                result.add(KeyValue.pair(key, value.toLowerCase()));
-                return result;
-            }
+        // Create an aggregation that totals the length in characters of the value for all records sharing the same key
+        KTable<String, Integer> aggregatedTable = groupedStream.aggregate(
+            () -> 0,
+            (aggKey, newValue, aggValue) -> aggValue + newValue.length(),
+            Materialized.with(Serdes.String(), Serdes.Integer())
         );
+        aggregatedTable.toStream().to("aggregations-output-charactercount-topic", Produced.with(Serdes.String(), Serdes.Integer()));
 
-        // For the "a" stream modify all records by uppercasing the key
-        aKeysStream = aKeysStream.map(
-            (key, value) -> KeyValue.pair(key.toUpperCase(), value)
-        );
+        // Count the number of records for each key
+        KTable<String, Long> countedTable = groupedStream.count(Materialized.with(Serdes.String(), Serdes.Long()));
 
-        // Merge the two streams back together
-        KStream<String, String> mergedStream = aKeysStream.merge(othersStream);
-
-        // Print each record to the console
-        mergedStream.peek((key, value) -> System.out.println("key=" + key + ", value=" + value));
-
-        // Output the transformed data to a topic
-        mergedStream.to("stateless-transformations-output-topic");
+        // Combine the values of all records with the same key into a string separated by spaces
+        KTable<String, String> reducedTable = groupedStream.reduce((aggValue, newValue) -> aggValue + " " + newValue));
+        reducedTable.toStream().to("aggregations-output-reduce-topic");
 
         // FINISH STREAM IMPLEMENTATION
                 
