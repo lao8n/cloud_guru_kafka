@@ -24,14 +24,20 @@ public class JoinsMain {
         final StreamsBuilder builder = new StreamsBuilder();
         
         // TO RUN
+        // Session 1
+        // 1. kafka-console-producer --broker-list localhost:9092 --topic joins-input-topic-left --property parse.key=true --property key.separator=:
+        // 2. a:a
         // Session 2
-        // 1. ./gradlew runStatelessTransformations
+        // 1. kafka-console-producer --broker-list localhost:9092 --topic joins-input-topic-right --property parse.key=true --property key.separator=:
+        // 2. b:b
         // Session 3
-        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-charactercount-topic --property print.key=true --property value.deserializer=org.apache.kafka.common.serialization.IntegerDeserializer
+        // 1. ./gradlew runJoins
         // Session 4
-        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-count-topic --property print.key=true --property value.deserializer=org.apache.kafka.common.serialization.LongDeserializer
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic inner-join-output-topic --property print.key=true
         // Session 5
-        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic aggregations-output-reduce-topic --property print.key=true
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic left-join-output-topic --property print.key=true
+        // Session 6
+        // 1. kafka-console-consumer --bootstrap-server localhost:9092 --topic outer-join-output-topic --property print.key=true
 
         // START STREAM IMPLEMENTATION
         KStream<String, String> left = builder.stream("joins-input-topic-left");

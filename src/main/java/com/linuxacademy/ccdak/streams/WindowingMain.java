@@ -23,7 +23,29 @@ public class WindowingMain {
         // Get the source stream.
         final StreamsBuilder builder = new StreamsBuilder();
         
-        //Implement streams logic.
+        // TO RUN
+        // Session 1
+        // 1. kafka-console-producer --broker-list localhost:9092 --topic windowing-input-topic --property parse.key=true --property key.separator=:
+        // 2. a:a
+        // Session 2
+        // ./gradlew runWindowing
+        // Session 3
+        // kafka-console-consumer --bootstrap-server localhost:9092 --topic windowing-output-topic --property print.key=true
+
+        // START STREAM IMPLEMENTATION
+        KStream<String, String> source = builder.stream("windowing-input-topic");
+
+        KGroupedStream<String, String> groupedStream = source.groupByKey();
+
+        // Apply windowing to the stream with tumbling time windows of 10 seconds.
+        TimeWindowedKStream<String, String> windowedStream = groupedStream.windowedBy(TimeWindows.of(Duration.ofSeconds(10))); 
+        // add .advancedBy(Duration.ofSeconds(12)) if want hopping time windows
+
+        // Combine the values of all records with the same key into a string separated by spaces, using 10-second windows.
+        KTable<Windowed<String>, String> reducedTable = windowedStream.reduce((aggValue, newValue) -> aggValue + " " + newValue);
+        reducedTable.toStream().to("windowing-output-topic", Produced.with(WindowedSerdes.timeWindowedSerdeFrom(String.class), Serdes.String()));
+
+        // FINISH STREAM IMPLEMENTATION
         
         final Topology topology = builder.build();
         final KafkaStreams streams = new KafkaStreams(topology, props);
